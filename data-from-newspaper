@@ -1,0 +1,67 @@
+#program to fetch datas from given news paper
+#add that into sql database
+import requests
+import xml.etree.ElementTree as ET
+import psycopg2
+
+#function to remove "'" if any in given news(headline,description or  link)
+def validate (datas) :
+    for data in datas:
+        st = ""
+        for char in data:
+            if char == "'" :
+                st += ""
+            else :
+                st += char
+        index = datas.index(data)#append formatted information into list
+        datas[index] = st
+    return datas
+#function to write into database
+def writedb(table, dt, val):
+    conn =  psycopg2.connect(host='127.0.0.1', port='5432', user='postgres', password='123', database='tfa')
+    st = 'insert into ' + table + "("
+    #making proper format  to insert values and datatypes inside sql
+    for data in dt:
+        if dt.index(data) == len(dt) - 1:
+            st += (data + ")")
+        else:
+            st += (data + ',')
+    st += ' values ('
+    for data in val:
+        if val.index(data) == len(val) - 1:
+            st += ("'" + data + "')")
+        else:
+            st += ("'"+data + "',")
+    cursor = conn.cursor()
+    cursor.execute(st)
+    conn.commit()
+    cursor.execute('select * from ' + 'News')
+    news = cursor.fetchall()
+
+files=['https://timesofindia.indiatimes.com/rssfeedstopstories.cms']
+
+for f in files:
+    res = requests.get(f)
+    if res.status_code == 200:
+        #call is successfull. Accesss the data
+        content = res.content
+        localfile = 'images/' + "file.xml"
+        with open(localfile, 'wb') as fp:
+            fp.write(content)
+
+ #       print('image is stored at '+localfile)
+
+tree = ET.parse('images/file.xml')
+root = tree.getroot()
+#print(root.tag)
+for i in root[0].findall('item'):
+    title = i.find('title').text
+    description = i.find('description').text
+    if description == None:
+        description = 'None'
+    link = i.find('link').text
+    #print(title,description,link)
+    variables = ['title','description','link']
+    values = [title,description,link]
+    values = validate(values)
+    writedb('News',variables,values)
